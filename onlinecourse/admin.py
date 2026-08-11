@@ -1,5 +1,4 @@
 from django.contrib import admin
-
 from .models import (
     Course,
     Lesson,
@@ -30,7 +29,11 @@ class LessonAdmin(admin.ModelAdmin):
     inlines = [QuestionInline]
 
 
-admin.site.register(Course)
+class CourseAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+
+
+admin.site.register(Course, CourseAdmin)
 admin.site.register(Lesson, LessonAdmin)
 admin.site.register(Instructor)
 admin.site.register(Learner)
