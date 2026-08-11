@@ -11,7 +11,7 @@ urlpatterns = [
     ),
 
     path(
-        "course/<int:course_id>/result/",
+        "course/<int:course_id>/result/<int:submission_id>/",
         views.show_exam_result,
         name="show_exam_result"
     ),
