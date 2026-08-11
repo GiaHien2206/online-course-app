@@ -1,6 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-
 from .models import Course, Question, Choice, Submission
 
 
@@ -9,36 +8,33 @@ def submit(request, course_id):
     course = get_object_or_404(Course, pk=course_id)
 
     if request.method == "POST":
+        submission = Submission.objects.create(
+            user=request.user,
+            course=course
+        )
 
         questions = Question.objects.filter(
             lesson__course=course
         )
 
         for question in questions:
-
             choice_id = request.POST.get(
                 f"question_{question.id}"
             )
 
             if choice_id:
-
                 choice = get_object_or_404(
                     Choice,
                     pk=choice_id,
                     question=question
                 )
 
-                Submission.objects.update_or_create(
-                    user=request.user,
-                    question=question,
-                    defaults={
-                        "choice": choice
-                    }
-                )
+                submission.choices.add(choice)
 
         return redirect(
             "onlinecourse:show_exam_result",
-            course_id=course.id
+            course_id=course.id,
+            submission_id=submission.id
         )
 
     return redirect(
@@ -48,51 +44,62 @@ def submit(request, course_id):
 
 
 @login_required
-def show_exam_result(request, course_id):
-
+def show_exam_result(request, course_id, submission_id):
     course = get_object_or_404(
         Course,
         pk=course_id
     )
 
-    submissions = Submission.objects.filter(
-        user=request.user,
-        question__lesson__course=course
-    ).select_related(
-        "question",
-        "choice"
+    submission = get_object_or_404(
+        Submission,
+        pk=submission_id,
+        user=request.user
     )
+
+    selected_choices = submission.choices.all()
 
     score = 0
     total = 0
     results = []
 
-    for submission in submissions:
+    questions = Question.objects.filter(
+        lesson__course=course
+    )
 
-        total += submission.question.grade
+    for question in questions:
+        total += question.grade
 
-        correct = submission.choice.is_correct
+        selected_choice = selected_choices.filter(
+            question=question
+        ).first()
+
+        correct = (
+            selected_choice is not None
+            and selected_choice.is_correct
+        )
 
         if correct:
-            score += submission.question.grade
+            score += question.grade
 
         results.append({
-            "question": submission.question,
-            "selected_choice": submission.choice,
-            "correct": correct
+            "question": question,
+            "selected_choice": selected_choice,
+            "correct": correct,
         })
-
-    passed = total > 0 and score >= total * 0.7
 
     context = {
         "course": course,
+        "submission": submission,
         "score": score,
         "total": total,
-        "passed": passed,
         "results": results,
     }
 
     return render(
+        request,
+        "onlinecourse/exam_result.html",
+        context
+    )
         request,
         "onlinecourse/exam_result.html",
         context
